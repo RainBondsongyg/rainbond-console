@@ -8,6 +8,9 @@ from django.db import DEFAULT_DB_ALIAS, connections, migrations
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 
+from console.utils.oauth_migration_repair import make_oauth_add_field_state_only, oauth_column_matches
+from console.utils.legacy_model_roundtrip import repair_generated_model_roundtrips
+
 
 DEFAULT_APP_LABELS = ("authtoken", "www", "console")
 RepairResult = namedtuple("RepairResult", ("app_label", "migration_name", "skipped_tables", "created_tables", "recorded"))
@@ -129,17 +132,22 @@ def repair_oauth_auto_create_user_column(connection, dry_run=False):
         if existing_column is None:
             # Normal migrate owns this column; pre-adding it would fail with duplicate column.
             return False
-        # Recover a prior startup that added the column but did not record its migration.
-        # Never mark a compound migration, a changed definition, or missing dependencies as applied.
-        for key, migration in pending:
-            operation = migration.operations[0]
-            if (len(pending) != 1 or len(migration.operations) != 1
-                    or operation.field.deconstruct()[1:] != field.deconstruct()[1:]
-                    or not set(migration.dependencies).issubset(loader.applied_migrations)
-                    or existing_column.null_ok != field.null):
-                raise CommandError("Cannot safely reconcile existing OAuth column for migration {}.{}".format(*key))
-        if not dry_run:
-            MigrationRecorder(connection).record_applied(*pending[0][0])
+        # Reconcile only the known OAuth field. Other operations and their
+        # dependencies must still be executed by Django's normal migration path.
+        if len(pending) != 1:
+            raise CommandError("Multiple pending OAuth field migrations require manual reconciliation")
+        key, migration = pending[0]
+        targets = [(index, operation) for index, operation in enumerate(migration.operations)
+                   if isinstance(operation, migrations.AddField) and operation.model_name.lower() == "oauthservices"
+                   and operation.name == field.name]
+        if (len(targets) != 1 or targets[0][1].field.deconstruct()[1:] != field.deconstruct()[1:]
+                or not set(migration.dependencies).issubset(loader.applied_migrations)
+                or not oauth_column_matches(connection, table, existing_column, field)):
+            raise CommandError("Cannot safely reconcile existing OAuth column for migration {}.{}".format(*key))
+        if len(migration.operations) > 1:
+            make_oauth_add_field_state_only(migration, targets[0][0], dry_run=dry_run)
+        elif not dry_run:
+            MigrationRecorder(connection).record_applied(*key)
         return True
     if existing_column is not None:
         return False
@@ -181,6 +189,8 @@ class Command(BaseCommand):
 
         plan = bool(options["plan"])
         results = repair_legacy_schema(connections[database], app_labels, dry_run=plan)
+        for name in repair_generated_model_roundtrips(connections[database], app_labels, dry_run=plan):
+            self.stdout.write("{} data-preserving migration {}".format("Would reconcile" if plan else "Reconciled", name))
         if "console" in app_labels and repair_oauth_auto_create_user_column(connections[database], dry_run=plan):
             self.stdout.write("{} console.oauth_service.auto_create_user".format("Would repair" if plan else "Repaired"))
         if not results:
