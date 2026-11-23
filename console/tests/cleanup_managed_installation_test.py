@@ -116,7 +116,10 @@ class ManagedCleanupInstallationTests(unittest.TestCase):
         self.assertEqual(values['CLEANUP_RECORD_RETIREMENT'], 'true')
         self.assertEqual(values['CLEANUP_REGISTRY_STORAGE_ROOT'], '/registry')
         self.assertEqual(values['CLEANUP_REGISTRY_URL'], 'http://rbd-hub.system.svc.cluster.local:5000')
-        updated = {call.args[3]['name']: call.args[3]['attribute_value'] for call in attrs.update_k8s_attribute.call_args_list}
+        calls = attrs.update_k8s_attribute.call_args_list + attrs.create_k8s_attribute.call_args_list
+        updated = {call.args[3]['name']: call.args[3]['attribute_value'] for call in calls}
+        self.assertTrue(attrs.create_k8s_attribute.called)
+        self.assertEqual(updated['serviceAccountName'], 'rainbond-enterprise-base')
         self.assertIn('-cleanup-scan-only=false', json.loads(updated['args']))
         self.assertIn('-plugin-id=rainbond-enterprise-base', json.loads(updated['args']))
         self.assertIn('existing-journal', updated['volumes'])

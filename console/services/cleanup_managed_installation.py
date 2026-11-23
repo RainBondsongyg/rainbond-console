@@ -102,12 +102,17 @@ def prepare_managed_installation(tenant, region, backend, plugin_id, region_app_
         return yaml.safe_load(raw) if isinstance(raw, str) else raw
 
     def save_attribute(name, value):
-        k8s_attribute_service.update_k8s_attribute(tenant, backend, region.region_name, {
+        attribute = {
             'name': name,
-            'save_type': 'yaml',
-            'attribute_value': json.dumps(value),
-            'operator': 'plugin-install'
-        })
+            'save_type': 'string' if isinstance(value, str) else 'yaml',
+            'attribute_value': value if isinstance(value, str) else json.dumps(value),
+        }
+        if k8s_attribute_service.get_by_component_ids_and_name(backend.service_id, name):
+            k8s_attribute_service.update_k8s_attribute(
+                tenant, backend, region.region_name, dict(attribute, operator='plugin-install'))
+        else:
+            k8s_attribute_service.create_k8s_attribute(
+                tenant, backend, region.region_name, attribute, 'plugin-install')
 
     previous_mounts = read_attribute('volumeMounts', [])
     previous_volumes = read_attribute('volumes', [])
