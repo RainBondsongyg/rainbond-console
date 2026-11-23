@@ -160,6 +160,10 @@ class RegionInvokeApi(RegionApiBaseHttpClient):
             raw = response.read(limit + 1)
             if len(raw) > limit or not 200 <= response.status <= 599:
                 raise ValueError()
+            if response.status in (404, 405) and path in (
+                    '/v2/cleanup/installations', '/v2/cleanup/installations/registry-view',
+                    '/v2/cleanup/installations/reconcile'):
+                return response.status, {'msg': 'CLEANUP_PLATFORM_UPGRADE_REQUIRED'}
             result = json.loads(raw)
             if not isinstance(result, dict):
                 raise ValueError()

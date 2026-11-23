@@ -271,6 +271,9 @@ class AppUpgrade(MarketApp):
             self._update_upgrade_record(UpgradeStatus.UPGRADE_FAILED.value)
             # rollback on failure
             self.rollback()
+            from console.services.rbd_plugin_sync_service import _RBDPluginSyncError
+            if isinstance(e, _RBDPluginSyncError):
+                raise e
             raise ServiceHandleException("unexpected error", "升级遇到了故障, 暂无法执行, 请稍后重试")
 
         self._deploy(self.record)  # type: ignore[arg-type]

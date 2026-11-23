@@ -38,6 +38,15 @@ class Obj(object):
 
 
 class RBDPluginSyncServiceTests(TestCase):
+    def test_unsupported_cleanup_platform_reports_the_upgrade_prerequisite(self):
+        from console.services.cleanup_managed_installation import CleanupPlatformUnsupported
+        with self.assertLogs('default', level='WARNING'):
+            with self.assertRaises(ServiceHandleException) as raised:
+                RBDPluginSyncService._fail('prepare_cleanup_platform', 23, 'rainbond-enterprise-base',
+                                           error=CleanupPlatformUnsupported())
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn('升级 Rainbond 平台', raised.exception.msg_show)
+
     def setUp(self):
         self.service = RBDPluginSyncService()
         self.tenant = Obj(

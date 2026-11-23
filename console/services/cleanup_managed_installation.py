@@ -4,8 +4,14 @@ import os
 from urllib.parse import urlsplit
 
 
+class CleanupPlatformUnsupported(ValueError):
+    pass
+
+
 def validate_installation_response(tenant, region, response):
     installation = response.get('bean') if isinstance(response, dict) else None
+    if not isinstance(installation, dict) or installation.get('protocol') != 1:
+        raise CleanupPlatformUnsupported()
     scope = installation.get('scope') if isinstance(installation, dict) else None
     if (not isinstance(scope, dict) or installation.get('protocol') != 1 or installation.get('phase') != 'prepared'
             or scope.get('enterprise') != tenant.enterprise_id or scope.get('region') != region.region_name
@@ -29,6 +35,8 @@ def prepare_managed_installation(tenant, region, backend, plugin_id, region_app_
     status, response = api.prepare_cleanup_installation(tenant.enterprise_id, region.region_name, plugin_id, region_app_id,
                                                         console_url)
     if status != 200:
+        if status in (404, 405):
+            raise CleanupPlatformUnsupported()
         raise ValueError('cleanup installation platform support is unavailable')
     installation = validate_installation_response(tenant, region, response)
     scope = installation['scope']
@@ -37,6 +45,8 @@ def prepare_managed_installation(tenant, region, backend, plugin_id, region_app_
     if target_origin.scheme not in ('http', 'https') or not target_origin.hostname:
         raise ValueError('cleanup installation Console origin is invalid')
     status, response = api.prepare_cleanup_registry_view(tenant.enterprise_id, region.region_name)
+    if status in (404, 405):
+        raise CleanupPlatformUnsupported()
     registry = response.get('bean') if isinstance(response, dict) else None
     if status != 200 or not isinstance(registry, dict) or registry.get('protocol') != 1:
         raise ValueError('cleanup installation Registry preparation is unavailable')

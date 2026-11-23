@@ -138,6 +138,10 @@ class CleanupCoreForwardingTests(unittest.TestCase):
         self.assertTrue(client.request.call_args.args[1].endswith('/v2/cleanup/reference-writers/console'))
         self.assertEqual(json.loads(client.request.call_args.kwargs['body']), {
             'pod': 'console-pod', 'pod_uid': 'pod-uid', 'protocol': 'registry-reference-v1'})
+        response.status = 404
+        response.read.return_value = b'404 page not found'
+        self.assertEqual(api._cleanup_control_request('e', 'r', '/v2/cleanup/installations', b'{}'),
+                         (404, {'msg': 'CLEANUP_PLATFORM_UPGRADE_REQUIRED'}))
         client.request.side_effect = RuntimeError('private-fixture-detail')
         with self.assertRaises(Unavailable) as error:
             api.cleanup_proxy_request('e', 'r', '/v2/cleanup/stores/discover', b'{}')

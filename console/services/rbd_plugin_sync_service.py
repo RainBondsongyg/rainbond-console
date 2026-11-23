@@ -498,10 +498,15 @@ class RBDPluginSyncService(object):
             error_type,
             " ".join(context_parts),
         )
+        platform_unsupported = False
+        if phase == 'prepare_cleanup_platform':
+            from console.services.cleanup_managed_installation import CleanupPlatformUnsupported
+            platform_unsupported = isinstance(error, CleanupPlatformUnsupported)
         raise _RBDPluginSyncError(
             msg="rbd_plugin_sync_failed",
-            msg_show="应用变更已提交，但插件注册同步失败，请重试升级或联系管理员",
-            status_code=502,
+            msg_show=("当前平台不支持磁盘清理自动安装，请先升级 Rainbond 平台后重试" if platform_unsupported
+                      else "应用变更已提交，但插件注册同步失败，请重试升级或联系管理员"),
+            status_code=409 if platform_unsupported else 502,
             bean={
                 "operation_committed": True,
                 "phase": phase,
