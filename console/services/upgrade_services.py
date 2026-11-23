@@ -946,6 +946,17 @@ class UpgradeService(object):
             self.synchronous_upgrade_status(team, region_name, app_record)
             app_record = AppUpgradeRecord.objects.get(ID=app_record.ID)
 
+            # Managed cleanup needs the same installation preparation as the UI,
+            # before any component is deployed (including retrying initialization).
+            from console.services.cleanup_installation import requires_managed_cleanup
+            target_template = get_upgrade_app_template(team, app_model_version, pc)
+            if requires_managed_cleanup(target_template):
+                region = RegionConfig.objects.get(region_name=region_name)
+                app = group_service.get_app_by_id(team, region_name, app_id)
+                self.upgrade(team, region, user, app, app_model_version, app_record)
+                app_records.append(AppUpgradeRecord.objects.get(ID=app_record.ID))
+                continue
+
             # 处理新增的组件
             install_info = {}
             if add_info:
