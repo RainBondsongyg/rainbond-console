@@ -118,6 +118,7 @@ class ManagedCleanupInstallationTests(unittest.TestCase):
         self.assertEqual(values['CLEANUP_REGISTRY_URL'], 'http://rbd-hub.system.svc.cluster.local:5000')
         updated = {call.args[3]['name']: call.args[3]['attribute_value'] for call in attrs.update_k8s_attribute.call_args_list}
         self.assertIn('-cleanup-scan-only=false', json.loads(updated['args']))
+        self.assertIn('-plugin-id=rainbond-enterprise-base', json.loads(updated['args']))
         self.assertIn('existing-journal', updated['volumes'])
         self.assertIn('/data/disk-cleanup', updated['volumeMounts'])
         volumes = {item['name']: item for item in json.loads(updated['volumes'])}

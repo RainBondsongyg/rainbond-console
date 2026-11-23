@@ -118,6 +118,9 @@ def prepare_managed_installation(tenant, region, backend, plugin_id, region_app_
     while index < len(args):
         arg = args[index]
         flag = arg.split('=', 1)[0]
+        if flag in ('-plugin-id', '--plugin-id'):
+            index += 1 if '=' in arg else 2
+            continue
         if flag in ('-cleanup-state-file', '--cleanup-state-file') and state_mount:
             kept.append(arg)
             index += 1
@@ -135,7 +138,7 @@ def prepare_managed_installation(tenant, region, backend, plugin_id, region_app_
             continue
         kept.append(arg)
         index += 1
-    save_attribute('args', kept + ['-disk-cleanup', '-cleanup-scan-only=false'])
+    save_attribute('args', kept + ['-plugin-id=' + plugin_id, '-disk-cleanup', '-cleanup-scan-only=false'])
     save_attribute('serviceAccountName', installation['serviceAccount'])
     additions = {
         'volumes': [{
