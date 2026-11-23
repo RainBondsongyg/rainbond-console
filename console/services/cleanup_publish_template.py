@@ -62,7 +62,8 @@ def discover_cleanup_template(template, team, region_name, version_reader, api):
 
 def _owned_name(name):
     return isinstance(name, str) and (name.startswith(
-        ('enterprise-base-disk-', 'rainbond-disk-')) or name in ('enterprise-base-registry-auth', 'rainbond-enterprise-base'))
+        ('enterprise-base-disk-', 'rainbond-disk-', 'enterprise-base-license-reader')) or name in (
+            'enterprise-base-registry-auth', 'rainbond-enterprise-base', 'rainbond-disk', 'rainbond-disk-cleanup'))
 
 
 def _value(attribute):

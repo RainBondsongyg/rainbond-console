@@ -104,6 +104,10 @@ class CleanupPublishTemplateTests(unittest.TestCase):
         template['k8s_resources'] = [{
             'content': 'kind: Secret\nmetadata:\n  name: rainbond-disk-system-control\n'
         }, {
+            'name': 'rainbond-disk', 'kind': 'RBDPlugin', 'content': '{}'
+        }, {
+            'name': 'enterprise-base-license-reader-rbd-plugins', 'kind': 'ClusterRoleBinding', 'content': '{}'
+        }, {
             'content': 'kind: ConfigMap\nmetadata:\n  name: business-config\n'
         }]
         result = portable_cleanup_template(template)
