@@ -74,7 +74,11 @@ class CleanupCoreBridgeView(APIView):
         if not verified:
             return Response({'msg': 'FORBIDDEN'}, status=403)
         try:
-            status, result = RegionInvokeApi().cleanup_proxy_request(enterprise_id, region_name, path, body)
+            api = RegionInvokeApi()
+            if path == '/v2/cleanup/installations/reconcile':
+                from console.services.cleanup_writer_registration import announce_console_writer
+                announce_console_writer(enterprise_id, region_name, api)
+            status, result = api.cleanup_proxy_request(enterprise_id, region_name, path, body)
         except Exception:
             return Response({'msg': 'COORDINATION_UNAVAILABLE'}, status=503)
         return Response(result, status=status)

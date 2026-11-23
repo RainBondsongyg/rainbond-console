@@ -192,12 +192,24 @@ class CleanupCoreForwardingTests(unittest.TestCase):
         self.assertEqual(scope['post'](view, request, 'e', 'r').status_code, 200)
         api.cleanup_proxy_request.assert_called_once_with('e', 'r', '/v2/cleanup/stores/discover', b'{}')
 
+        # Readiness must announce Console before inventory runs, otherwise the
+        # frontend waits for a proof that only the blocked inventory can create.
+        from unittest.mock import patch
+        request.body = b'{"path":"/v2/cleanup/installations/reconcile","body":"{}"}'
+        message = '\n'.join(['cleanup-coordination-v1', 'POST', request_path, 'e', 'r', issued,
+                             hashlib.sha256(request.body).hexdigest()]).encode()
+        request.headers['X-Cleanup-Coordination-Signature'] = hmac.new(key, message, hashlib.sha256).hexdigest()
+        with patch('console.services.cleanup_writer_registration.announce_console_writer') as announce:
+            self.assertEqual(scope['post'](view, request, 'e', 'r').status_code, 200)
+            announce.assert_called_once_with('e', 'r', api)
+
         # A plugin signature cannot be replayed to the independently keyed system URL.
+        request.body = raw
         request.get_full_path = lambda: '/console/cleanup/internal/system-coordination/e/r'
         self.assertEqual(scope['post'](SimpleNamespace(resolve_key=lambda *_: key), request, 'e', 'r').status_code, 403)
         system_resolver = Mock(side_effect=CleanupGatewayUnavailable())
         self.assertEqual(scope['post'](SimpleNamespace(resolve_key=system_resolver), request, 'e', 'r').status_code, 503)
-        self.assertEqual(api.cleanup_proxy_request.call_count, 1)
+        self.assertEqual(api.cleanup_proxy_request.call_count, 2)
         # The routed subclass selects only the system resolver, with no plugin fallback.
         subclass = next(n for n in ast.parse(path.read_text()).body
                         if isinstance(n, ast.ClassDef) and n.name == 'CleanupSystemCoreBridgeView')
@@ -213,4 +225,4 @@ class CleanupCoreForwardingTests(unittest.TestCase):
         system_resolver.side_effect = None
         system_resolver.return_value = system_key
         self.assertEqual(scope['post'](scope['CleanupSystemCoreBridgeView'](), request, 'e', 'r').status_code, 200)
-        self.assertEqual(api.cleanup_proxy_request.call_count, 2)
+        self.assertEqual(api.cleanup_proxy_request.call_count, 3)
