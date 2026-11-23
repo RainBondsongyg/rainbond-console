@@ -189,12 +189,14 @@ class CleanupCoreForwardingTests(unittest.TestCase):
             'X-Cleanup-Coordination-Time': issued,
             'X-Cleanup-Coordination-Signature': hmac.new(key, payload, hashlib.sha256).hexdigest()
         }
-        self.assertEqual(scope['post'](view, request, 'e', 'r').status_code, 200)
+        from unittest.mock import patch
+        with patch('console.services.cleanup_writer_registration.announce_console_writer') as initial_announce:
+            self.assertEqual(scope['post'](view, request, 'e', 'r').status_code, 200)
+            initial_announce.assert_called_once_with('e', 'r', api)
         api.cleanup_proxy_request.assert_called_once_with('e', 'r', '/v2/cleanup/stores/discover', b'{}')
 
         # Readiness must announce Console before inventory runs, otherwise the
         # frontend waits for a proof that only the blocked inventory can create.
-        from unittest.mock import patch
         request.body = b'{"path":"/v2/cleanup/installations/reconcile","body":"{}"}'
         message = '\n'.join(['cleanup-coordination-v1', 'POST', request_path, 'e', 'r', issued,
                              hashlib.sha256(request.body).hexdigest()]).encode()
