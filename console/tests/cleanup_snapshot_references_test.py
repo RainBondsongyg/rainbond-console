@@ -48,6 +48,16 @@ class SnapshotReferenceTests(unittest.TestCase):
         self.assertEqual(result['images'], ['goodrain.me/app:v1'])
         self.assertNotIn('do-not-export', json.dumps(result))
 
+    def test_startup_arguments_in_an_upgrade_snapshot_do_not_hide_registry_candidates(self):
+        component = {'service_base': {'service_id': 's', 'image': 'goodrain.me/base:v1'},
+                     'component_k8s_attributes': [
+                         {'name': 'args', 'attribute_value': ['-disk-cleanup', '-cleanup-scan-only=false']},
+                         {'name': 'cmd', 'attribute_value': ['/bin/plugin']},
+                         {'name': 'workingDir', 'attribute_value': '/app'}]}
+        result = snapshot_reference_resource({'ID': 91, 'snapshot': json.dumps({'components': [component]})}, 'r')
+        self.assertTrue(result['observed'])
+        self.assertEqual(result['images'], ['goodrain.me/base:v1'])
+
     def test_source_snapshot_without_saved_image_and_non_image_attributes_is_complete(self):
         component = {
             'service_base': {

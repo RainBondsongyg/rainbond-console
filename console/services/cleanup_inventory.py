@@ -337,7 +337,7 @@ def deployment_resource(row, region):
 # These attributes cannot add or replace a container image. Unknown attributes
 # remain incomplete until their image semantics are explicitly understood.
 SNAPSHOT_NON_IMAGE_ATTRIBUTES = frozenset((
-    "affinity", "hostNetwork", "labels", "nodeSelector", "podSecurityContext",
+    "affinity", "args", "cmd", "workingDir", "hostNetwork", "labels", "nodeSelector", "podSecurityContext",
     "serviceAccountName", "tolerations", "volumeMounts", "volumes"
 ))
 IMAGE_OPTIONAL_SOURCES = frozenset(("package_build", "source_code", "third_party"))
