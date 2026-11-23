@@ -159,6 +159,7 @@ class CleanupInstallationLifecycleTests(unittest.TestCase):
             sync = ModuleType('console.services.rbd_plugin_sync_service')
             sync.rbd_plugin_sync_service = SimpleNamespace(reconcile=lambda *args: calls.append('configure'))
             obj = SimpleNamespace(install_plugins=Mock(), sync_new_app=Mock(), save_new_app=Mock(),
+                                  cleanup_console_origin='https://console.example',
                                   create_service_tcp_domains=Mock(), region=object(), tenant=object(),
                                   app=SimpleNamespace(ID=42), app_template={'platform_plugin': {
                                       'plugin_id': plugin, 'bundled_disk_cleanup': bundled}},
@@ -187,6 +188,7 @@ class CleanupInstallationLifecycleTests(unittest.TestCase):
         sync = ModuleType('console.services.rbd_plugin_sync_service')
         sync.rbd_plugin_sync_service = SimpleNamespace(reconcile=lambda *args: calls.append('configure'))
         obj = SimpleNamespace(install_plugins=Mock(), sync_new_app=Mock(), _save_app=Mock(), region=object(),
+                              cleanup_console_origin='https://console.example',
                               tenant=SimpleNamespace(tenant_name="team"), region_name="r", user=object(),
                               app=SimpleNamespace(ID=42), record=SimpleNamespace(ID=1),
                               app_model_key='model', version='v2',

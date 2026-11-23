@@ -20,6 +20,15 @@ class CleanupGatewayUnavailable(Exception):
     pass
 
 
+def is_cleanup_backend(plugin_name, file_path):
+    name = str(plugin_name or '').lower()
+    if name in ('rainbond-disk', 'rainbond-disk-cleanup'):
+        return True
+    return name in ('rainbond-enterprise-base', 'rainbond-enterprise-base-amd64', 'rainbond-enterprise-base-arm64') and (
+        file_path in ('api/v1/clusters', 'api/v1/installation', 'api/v1/development/revision')
+        or str(file_path).startswith('api/v1/clusters/'))
+
+
 def prepare_cleanup_request(request, region_name, file_path, is_admin, region_allowed, key, now=None):
     for name in list(request.META):
         if name.startswith("HTTP_X_CLEANUP_"):

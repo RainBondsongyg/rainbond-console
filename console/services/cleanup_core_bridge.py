@@ -6,7 +6,8 @@ import re
 import time
 
 _ID = r'[A-Za-z0-9_.:-]{1,64}'
-_EXACT = frozenset(('/v2/cleanup/stores/discover', '/v2/cleanup/registry/prepare', '/v2/cleanup/managed-cache/prepare',
+_EXACT = frozenset(('/v2/cleanup/installations/reconcile', '/v2/cleanup/stores/discover', '/v2/cleanup/registry/prepare',
+                    '/v2/cleanup/managed-cache/prepare',
                     '/v2/cleanup/managed-cache/inventory', '/v2/cleanup/managed-packages/prepare'))
 _STORE_ACTIONS = frozenset(
     ('operations', 'status', 'observation-permit', 'reference-inventory', 'participants/registry', 'uploads/lookup'))
@@ -17,6 +18,23 @@ _OPERATION_ACTIONS = frozenset(
      'maintenance/job/cancel-failed', 'maintenance/cancel', 'maintenance/complete', 'maintenance/measurement',
      'maintenance/restore', 'maintenance/restored', 'node/cancel-before-grant', 'node/submit-job', 'node/start-job',
      'node/enter-job', 'node/result', 'node/finish', 'node/status', 'node/recover'))
+
+
+def verify_base_plugin_request(path, enterprise, region, issued_at, signature, body, now=None):
+    from console.services.cleanup_installation import resolve_gateway_key
+    from console.services.cleanup_gateway import CleanupGatewayUnavailable
+    available = False
+    for name in ('rainbond-enterprise-base', 'rainbond-enterprise-base-amd64', 'rainbond-enterprise-base-arm64'):
+        try:
+            key = resolve_gateway_key(enterprise, region, name)
+        except Exception:
+            continue
+        available = True
+        if verify_core_request(path, enterprise, region, issued_at, signature, body, key, now=now):
+            return True
+    if not available:
+        raise CleanupGatewayUnavailable()
+    return False
 
 
 def allowed_core_path(path: str) -> bool:

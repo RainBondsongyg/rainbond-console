@@ -83,6 +83,8 @@ class AppUpgrade(MarketApp):
         self.region = region
         self.region_name = region.region_name
         self.user = user
+        from console.services.cleanup_installation_context import current_console_origin
+        self.cleanup_console_origin = current_console_origin()
 
         self.component_group = ComponentGroup(enterprise_id, component_group, version)
         self.record = record
@@ -214,7 +216,8 @@ class AppUpgrade(MarketApp):
         from console.services.cleanup_installation import requires_cleanup_bootstrap
         if requires_cleanup_bootstrap(self.app_template):
             from console.services.rbd_plugin_sync_service import rbd_plugin_sync_service
-            rbd_plugin_sync_service.reconcile(self.tenant, self.region, self.app_template, self.app.ID)
+            rbd_plugin_sync_service.reconcile(
+                self.tenant, self.region, self.app_template, self.app.ID, self.cleanup_console_origin)
 
         if self.is_deploy:
             events = self._install_deploy()
@@ -261,7 +264,8 @@ class AppUpgrade(MarketApp):
             from console.services.cleanup_installation import requires_cleanup_bootstrap
             if requires_cleanup_bootstrap(self.app_template):
                 from console.services.rbd_plugin_sync_service import rbd_plugin_sync_service
-                rbd_plugin_sync_service.reconcile(self.tenant, self.region, self.app_template, self.app.ID)
+                rbd_plugin_sync_service.reconcile(
+                    self.tenant, self.region, self.app_template, self.app.ID, self.cleanup_console_origin)
         except Exception as e:
             logger.exception(e)
             self._update_upgrade_record(UpgradeStatus.UPGRADE_FAILED.value)

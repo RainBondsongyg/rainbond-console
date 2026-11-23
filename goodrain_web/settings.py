@@ -226,6 +226,7 @@ if IS_OPEN_API:
 MIDDLEWARE = (
     'goodrain_web.performance.PerformanceTimingMiddleware',
     'goodrain_web.middleware.ErrorPage',
+    'console.services.cleanup_installation_context.CleanupInstallationContextMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

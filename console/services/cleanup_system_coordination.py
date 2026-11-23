@@ -11,6 +11,29 @@ import os
 from console.services.cleanup_gateway import CleanupGatewayUnavailable
 
 
+def verify_system_coordination_request(path, enterprise, region, issued_at, signature, body, api=None):
+    expected_path = '/console/cleanup/internal/system-coordination/' + enterprise + '/' + region
+    if path != expected_path:
+        return False
+    if os.environ.get('CLEANUP_SYSTEM_COORDINATION_FILE'):
+        from console.services.cleanup_core_bridge import verify_core_request
+        key = resolve_system_coordination_key(enterprise, region)
+        return verify_core_request(path, enterprise, region, issued_at, signature, body, key)
+    if api is None:
+        from www.apiclient.regionapi import RegionInvokeApi
+        api = RegionInvokeApi()
+    try:
+        status, response = api.verify_cleanup_system_identity(enterprise, region, issued_at, signature, body)
+        if status == 403:
+            return False
+        result = response.get('bean') if isinstance(response, dict) else None
+        if status != 200 or not isinstance(result, dict) or result.get('protocol') != 1:
+            raise CleanupGatewayUnavailable()
+        return result.get('verified') is True
+    except Exception:
+        raise CleanupGatewayUnavailable() from None
+
+
 def resolve_system_coordination_key(enterprise: str, region: str) -> bytes:
     from console.repositories.region_repo import region_repo
 

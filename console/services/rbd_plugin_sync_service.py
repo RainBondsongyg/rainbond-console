@@ -7,7 +7,9 @@ from console.models.main import RegionConfig
 from console.repositories.app_config import dep_relation_repo, port_repo
 from console.repositories.region_app import region_app_repo
 from console.services.share_services import share_service
-from console.services.cleanup_installation import requires_cleanup_bootstrap, bundled_cleanup_registration
+from console.services.cleanup_installation import (
+    requires_cleanup_bootstrap, requires_managed_cleanup, bundled_cleanup_registration,
+)
 from console.utils.plugin_identity import is_gateway_monitoring_plugin
 from www.apiclient.regionapi import RegionInvokeApi
 from www.models.main import ServiceGroupRelation, TenantServiceInfo, Tenants
@@ -24,7 +26,8 @@ class RBDPluginSyncService(object):
     REQUIRED_FIELDS = ("plugin_id", "plugin_type", "frontend_component", "entry_path")
     INJECT_POSITION_TYPES = (list, tuple)
 
-    def reconcile(self, tenant: Tenants, region: RegionConfig, app_template: dict, app_id: Any) -> Dict[str, Any]:
+    def reconcile(self, tenant: Tenants, region: RegionConfig, app_template: dict, app_id: Any,
+                  console_url=None) -> Dict[str, Any]:
         platform_plugin = app_template.get("platform_plugin") if isinstance(app_template, dict) else None
         if not isinstance(platform_plugin, dict) or not platform_plugin.get("is_platform_plugin"):
             return {"status": "skipped", "reason": "not_platform_plugin"}
@@ -32,7 +35,7 @@ class RBDPluginSyncService(object):
         raw_plugin_id = platform_plugin.get("plugin_id")
         plugin_id = raw_plugin_id.strip() if isinstance(raw_plugin_id, str) else ""
         try:
-            return self._reconcile_platform_plugin(tenant, region, app_template, platform_plugin, app_id)
+            return self._reconcile_platform_plugin(tenant, region, app_template, platform_plugin, app_id, console_url)
         except _RBDPluginSyncError:
             raise
         except ServiceHandleException as error:
@@ -53,7 +56,7 @@ class RBDPluginSyncService(object):
             )
 
     def _reconcile_platform_plugin(self, tenant: Tenants, region: RegionConfig, app_template: dict, platform_plugin: dict,
-                                   app_id: Any) -> Dict[str, Any]:
+                                   app_id: Any, console_url=None) -> Dict[str, Any]:
         platform_plugin = self._validate_template(platform_plugin, app_id)
         plugin_id = platform_plugin["plugin_id"]
         namespace = getattr(tenant, "namespace", "")
@@ -170,6 +173,15 @@ class RBDPluginSyncService(object):
                 error=error,
                 safe_context=safe_context,
             )
+
+        if requires_managed_cleanup(app_template):
+            from console.services.cleanup_installation_context import current_console_origin
+            from console.services.cleanup_managed_installation import prepare_managed_installation
+            try:
+                prepare_managed_installation(tenant, region, backend_component, plugin_id,
+                                             region_app_id, console_url or current_console_origin())
+            except Exception as error:
+                self._fail("prepare_cleanup_platform", app_id, plugin_id, error=error)
 
         logger.info(
             "rbdplugin reconciled plugin_id=%s app_id=%s region_name=%s frontend_component=%s "

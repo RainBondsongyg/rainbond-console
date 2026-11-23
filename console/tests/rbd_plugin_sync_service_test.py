@@ -148,6 +148,26 @@ class RBDPluginSyncServiceTests(TestCase):
         self.assertEqual(apply.call_count, 1)
         self.assertEqual(apply.call_args.args[2]['plugin_id'], 'rainbond-enterprise-base')
 
+    def test_managed_installation_is_prepared_after_registration_before_deployment(self):
+        self.template['platform_plugin'].update(plugin_id='rainbond-enterprise-base', bundled_disk_cleanup=True,
+                                                cleanup_installation_protocol=1)
+        patches = self._patch_desired_state()
+        order = []
+        with patches[0] as relations, patches[1], patches[2], patches[3], patches[4], patches[5] as apply, \
+                mock.patch('console.services.cleanup_installation.configure_installation'), \
+                mock.patch('console.services.rbd_plugin_sync_service.region_api.list_plugins',
+                           return_value=(None, {'list': []})), \
+                mock.patch('console.services.cleanup_installation_context.current_console_origin',
+                           return_value='https://console.example'), \
+                mock.patch('console.services.cleanup_managed_installation.prepare_managed_installation') as prepare:
+            relations.return_value.values_list.return_value = ['svc-ui', 'svc-api']
+            apply.side_effect = lambda *args: order.append('register')
+            prepare.side_effect = lambda *args: order.append('prepare')
+            self.service.reconcile(self.tenant, self.region, self.template, 23)
+        self.assertEqual(order, ['register', 'register', 'prepare'])
+        prepare.assert_called_once_with(self.tenant, self.region, self.ui, 'rainbond-enterprise-base',
+                                        'region-app-1', 'https://console.example')
+
     def test_failed_inventory_cannot_overwrite_an_existing_cleanup_installation(self):
         self.template['platform_plugin'].update(plugin_id='rainbond-enterprise-base', bundled_disk_cleanup=True)
         patches = self._patch_desired_state()

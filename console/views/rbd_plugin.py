@@ -279,7 +279,8 @@ class RainbondPluginBackendView(JWTAuthApiView):
 
     def initial(self, request: Request, *args: Any, **kwargs: Any) -> None:
         super().initial(request, *args, **kwargs)
-        if kwargs.get("plugin_name") not in ("rainbond-disk", "rainbond-disk-cleanup"):
+        from console.services.cleanup_gateway import is_cleanup_backend
+        if not is_cleanup_backend(kwargs.get("plugin_name"), kwargs.get("file_path", "")):
             return
         region_name = kwargs.get("region_name")
         enterprise_id = self.user.enterprise_id
@@ -290,7 +291,7 @@ class RainbondPluginBackendView(JWTAuthApiView):
         if not self.is_enterprise_admin or not region_allowed:
             raise PermissionDenied("无权管理此集群的磁盘资源")
         try:
-            key = resolve_gateway_key(enterprise_id, region_name)
+            key = resolve_gateway_key(enterprise_id, region_name, kwargs.get("plugin_name"))
             prepare_cleanup_request(request, region_name, kwargs.get("file_path", ""), self.is_enterprise_admin, region_allowed,
                                     key)
         except CleanupAccessDenied:

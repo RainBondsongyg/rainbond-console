@@ -9,6 +9,13 @@ from console.services.cleanup_gateway import CleanupAccessDenied, CleanupGateway
 
 
 class CleanupGatewayTests(TestCase):
+    def test_bundled_cleanup_is_scoped_to_its_parent_plugin_without_changing_other_apis(self):
+        from console.services.cleanup_gateway import is_cleanup_backend
+        self.assertTrue(is_cleanup_backend('rainbond-enterprise-base-AMD64', 'api/v1/installation'))
+        self.assertTrue(is_cleanup_backend('rainbond-enterprise-base', 'api/v1/clusters/region/scans'))
+        self.assertFalse(is_cleanup_backend('rainbond-enterprise-base', 'api/v1/customization'))
+        self.assertFalse(is_cleanup_backend('unrelated', 'api/v1/clusters/region/scans'))
+
     def request(self):
         return SimpleNamespace(method="POST", body=b'{"scanId":"scan-1"}',
                                user=SimpleNamespace(user_id=7, enterprise_id="enterprise-1"),
@@ -112,5 +119,5 @@ class CleanupProxyIntegrationTests(TestCase):
         req = CleanupGatewayTests().request()
         req.is_admin = True
         cls().initial(req, plugin_name="rainbond-disk", region_name="r1", file_path="api/v1/clusters")
-        resolver.assert_called_once_with("enterprise-1", "r1")
+        resolver.assert_called_once_with("enterprise-1", "r1", "rainbond-disk")
         self.assertIn("HTTP_X_CLEANUP_SIGNATURE", req.META)

@@ -7,8 +7,22 @@ from console.services.cleanup_core_bridge import decode_core_request, verify_cor
 
 
 class CleanupCoreBridgeTests(unittest.TestCase):
+    def test_parent_installation_can_initialize_when_a_standalone_disk_alias_is_retained(self):
+        from unittest.mock import patch
+        from console.services.cleanup_core_bridge import verify_base_plugin_request
+        key = b'public-parent-fixture-' * 3
+        path = '/console/cleanup/internal/coordination/e/r'
+        body = b'{"path":"/v2/cleanup/installations/reconcile","body":"{}"}'
+        message = '\n'.join(['cleanup-coordination-v1', 'POST', path, 'e', 'r', '100',
+                             hashlib.sha256(body).hexdigest()]).encode()
+        signature = hmac.new(key, message, hashlib.sha256).hexdigest()
+        with patch('console.services.cleanup_installation.resolve_gateway_key', return_value=key):
+            self.assertTrue(verify_base_plugin_request(path, 'e', 'r', '100', signature, body, now=100))
+            self.assertFalse(verify_base_plugin_request(path, 'e', 'other', '100', signature, body, now=100))
+
     def test_only_fixed_cleanup_operations_are_forwardable(self):
         for path in [
+                '/v2/cleanup/installations/reconcile',
                 '/v2/cleanup/managed-cache/inventory', '/v2/cleanup/managed-packages/prepare',
                 '/v2/cleanup/stores/s/operations', '/v2/cleanup/stores/s/observation-permit',
                 '/v2/cleanup/stores/s/operations/o/node/recover', '/v2/cleanup/stores/s/operations/o/maintenance/job/status'

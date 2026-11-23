@@ -593,6 +593,12 @@ class ShareService(object):
 
         platform_plugin = self._build_platform_plugin_config(share_version_info)
         if platform_plugin:
+            snapshot_plugin = snapshot_template.get("platform_plugin") or {}
+            if (snapshot_plugin.get("plugin_id") == platform_plugin.get("plugin_id")
+                    and type(snapshot_plugin.get("cleanup_installation_protocol")) is int
+                    and snapshot_plugin["cleanup_installation_protocol"] == 1):
+                platform_plugin["cleanup_installation_protocol"] = 1
+                platform_plugin["bundled_disk_cleanup"] = True
             app_template["platform_plugin"] = platform_plugin
         else:
             app_template.pop("platform_plugin", None)
@@ -1387,6 +1393,9 @@ class ShareService(object):
                     transaction.savepoint_rollback(sid)
                 logger.exception(e)
                 return 500, "组件信息处理发生错误", None
+            from console.services.cleanup_publish_template import discover_cleanup_template
+            app_template = discover_cleanup_template(app_template, share_team, region_name,
+                                                     self.get_team_service_deploy_version, region_api)
             share_record.scope = scope
             app_arch = app_arch if app_arch else {app_template.get("arch", "amd64"): 1}
             app_template["arch"] = "&".join(app_arch.keys())

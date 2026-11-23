@@ -53,6 +53,29 @@ class RegionInvokeApi(RegionApiBaseHttpClient):
             raise ServiceHandleException("invalid cleanup coordination request", status_code=400)
         return self._cleanup_control_request(enterprise_id, region_name, path, body)
 
+    def prepare_cleanup_installation(self, enterprise_id: str, region_name: str, plugin_id: str,
+                                     app_id: str, console_url: str) -> Tuple[int, Dict[str, Any]]:
+        """Prepare one registered plugin through the server-owned Region identity."""
+        command = {'enterprise': enterprise_id, 'region': region_name, 'plugin_id': plugin_id,
+                   'app_id': app_id, 'console_url': console_url}
+        pod_name, pod_uid = os.environ.get('POD_NAME', ''), os.environ.get('POD_UID', '')
+        if pod_name and pod_uid:
+            command.update(console_pod_name=pod_name, console_pod_uid=pod_uid)
+        return self._cleanup_control_request(enterprise_id, region_name, '/v2/cleanup/installations',
+                                             json.dumps(command).encode('utf-8'))
+
+    def verify_cleanup_system_identity(self, enterprise_id: str, region_name: str, issued_at: str,
+                                       signature: str, body: bytes) -> Tuple[int, Dict[str, Any]]:
+        """Validate a platform callback without transporting its signing key."""
+        command = {'enterprise': enterprise_id, 'region': region_name, 'issued_at': issued_at,
+                   'signature': signature, 'body': body.decode('utf-8')}
+        return self._cleanup_control_request(enterprise_id, region_name, '/v2/cleanup/system-identity/verify',
+                                             json.dumps(command).encode('utf-8'))
+
+    def prepare_cleanup_registry_view(self, enterprise_id: str, region_name: str) -> Tuple[int, Dict[str, Any]]:
+        """Use only the registered installation's observed target Registry."""
+        return self._cleanup_control_request(enterprise_id, region_name, '/v2/cleanup/installations/registry-view', b'{}')
+
     def cleanup_upload_inventory(self, enterprise_id: str, region_name: str,
                                  event_ids: list[str]) -> Tuple[int, Dict[str, Any]]:
         """Read chunks for server-selected owned events; not exposed by the generic plugin bridge."""

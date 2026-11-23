@@ -41,10 +41,37 @@ class CleanupCoreBridgeView(APIView):
         try:
             key = self.resolve_key(enterprise_id, region_name)
         except CleanupGatewayUnavailable:
-            return Response({'msg': 'COORDINATION_UNAVAILABLE'}, status=503)
-        if not verify_core_request(request.get_full_path(), enterprise_id, region_name,
-                                   request.headers.get('X-Cleanup-Coordination-Time', ''),
-                                   request.headers.get('X-Cleanup-Coordination-Signature', ''), raw, key):
+            verifier = getattr(self, 'verify_in_region', None)
+            if verifier is None:
+                from console.services.cleanup_core_bridge import verify_base_plugin_request
+                try:
+                    verified = verify_base_plugin_request(
+                        request.get_full_path(), enterprise_id, region_name,
+                        request.headers.get('X-Cleanup-Coordination-Time', ''),
+                        request.headers.get('X-Cleanup-Coordination-Signature', ''), raw)
+                except CleanupGatewayUnavailable:
+                    return Response({'msg': 'COORDINATION_UNAVAILABLE'}, status=503)
+            elif os.environ.get('CLEANUP_SYSTEM_COORDINATION_FILE'):
+                return Response({'msg': 'COORDINATION_UNAVAILABLE'}, status=503)
+            else:
+                try:
+                    verified = verifier(request, enterprise_id, region_name, raw)
+                except CleanupGatewayUnavailable:
+                    return Response({'msg': 'COORDINATION_UNAVAILABLE'}, status=503)
+        else:
+            verified = verify_core_request(request.get_full_path(), enterprise_id, region_name,
+                                           request.headers.get('X-Cleanup-Coordination-Time', ''),
+                                           request.headers.get('X-Cleanup-Coordination-Signature', ''), raw, key)
+            if not verified and getattr(self, 'verify_in_region', None) is None:
+                from console.services.cleanup_core_bridge import verify_base_plugin_request
+                try:
+                    verified = verify_base_plugin_request(
+                        request.get_full_path(), enterprise_id, region_name,
+                        request.headers.get('X-Cleanup-Coordination-Time', ''),
+                        request.headers.get('X-Cleanup-Coordination-Signature', ''), raw)
+                except CleanupGatewayUnavailable:
+                    verified = False
+        if not verified:
             return Response({'msg': 'FORBIDDEN'}, status=403)
         try:
             status, result = RegionInvokeApi().cleanup_proxy_request(enterprise_id, region_name, path, body)
@@ -57,3 +84,9 @@ class CleanupSystemCoreBridgeView(CleanupCoreBridgeView):
     """Separate URL and trust root for platform services surviving plugin removal."""
 
     resolve_key = staticmethod(resolve_system_coordination_key)
+
+    def verify_in_region(self, request, enterprise_id, region_name, raw):
+        from console.services.cleanup_system_coordination import verify_system_coordination_request
+        return verify_system_coordination_request(request.get_full_path(), enterprise_id, region_name,
+                                                  request.headers.get('X-Cleanup-Coordination-Time', ''),
+                                                  request.headers.get('X-Cleanup-Coordination-Signature', ''), raw)

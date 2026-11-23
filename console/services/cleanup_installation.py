@@ -19,6 +19,13 @@ def requires_cleanup_bootstrap(app_template: dict) -> bool:
         and plugin.get("bundled_disk_cleanup") is True)
 
 
+def requires_managed_cleanup(app_template: dict) -> bool:
+    """Only versions declaring the install protocol enter automatic provisioning."""
+    plugin = app_template.get("platform_plugin") or {}
+    return requires_cleanup_bootstrap(app_template) and type(plugin.get("cleanup_installation_protocol")) is int and (
+        plugin["cleanup_installation_protocol"] == 1)
+
+
 def bundled_cleanup_registration(parent: dict, existing_plugins: list) -> dict | None:
     """Register an alias within this installation without taking over a standalone app."""
     if not all(parent.get(field) for field in ("app_id", "namespace", "frontend_service", "backend_service")):
@@ -56,7 +63,7 @@ def decode_gateway_secret(secret: dict, namespace: str, enterprise: str, region:
     return key
 
 
-def resolve_gateway_key(enterprise: str, region: str) -> bytes:
+def resolve_gateway_key(enterprise: str, region: str, plugin_name: str = 'rainbond-disk') -> bytes:
     """An installed app owned by this enterprise is required, even for legacy keys."""
     from console.repositories.region_repo import region_repo
     from console.repositories.region_app import region_app_repo
@@ -68,7 +75,7 @@ def resolve_gateway_key(enterprise: str, region: str) -> bytes:
             raise CleanupGatewayUnavailable()
         api = RegionInvokeApi()
         _, body = api.list_plugins(enterprise, region, False)
-        plugins = [p for p in (body or {}).get("list", []) if p.get("name") == "rainbond-disk"]
+        plugins = [p for p in (body or {}).get("list", []) if p.get("name") == plugin_name.lower()]
         if len(plugins) != 1 or not plugins[0].get("region_app_id"):
             raise CleanupGatewayUnavailable()
         app_id = region_app_repo.get_app_id(region, plugins[0]["region_app_id"])
@@ -76,7 +83,7 @@ def resolve_gateway_key(enterprise: str, region: str) -> bytes:
         tenant = Tenants.objects.get(tenant_id=app.tenant_id, enterprise_id=enterprise)
         # Explicit legacy deployments continue to work; automatic installations need no Console env.
         key_path = os.environ.get("CLEANUP_GATEWAY_KEY_FILE", "")
-        if key_path:
+        if key_path and plugin_name in ('rainbond-disk', 'rainbond-disk-cleanup'):
             with open(key_path, "rb") as stream:
                 key = stream.read(4097).strip()
             if not 32 <= len(key) <= 4096:
